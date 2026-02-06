@@ -136,10 +136,13 @@ pub fn format(self: *@This(), node: Ast.Node.Index) anyerror!void {
             try self.writeColored(Color.number, '-', self.tokenSlice(operand_token));
         },
         else => {
-            // Fallback: just write the token
-            try self.writeIndent();
             const token = self.ast.nodeMainToken(node);
-            try self.writer.writeAll(self.tokenSlice(token));
+            const loc = self.ast.tokenLocation(0, token);
+            self.semantic_error = .{
+                .message = "unexpected node in ZON",
+                .line = loc.line + 1,
+                .column = loc.column + 1,
+            };
         },
     }
 }
