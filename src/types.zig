@@ -9,7 +9,7 @@ pub const ParseError = struct {
     /// Optional context (e.g., field name that wasn't found)
     context: ?[]const u8 = null,
 
-    pub fn write(self: ParseError, file: std.fs.File) void {
+    pub fn write(self: ParseError, io: std.Io, file: std.Io.File) void {
         var buf: [256]u8 = undefined;
         const has_location = self.line > 0 and self.column > 0;
         const msg = if (self.context) |ctx|
@@ -33,7 +33,7 @@ pub const ParseError = struct {
             }) catch return
         else
             std.fmt.bufPrint(&buf, "zq: {s}\n", .{self.message}) catch return;
-        file.writeAll(msg) catch {};
+        file.writeStreamingAll(io, msg) catch {};
     }
 };
 

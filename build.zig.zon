@@ -2,7 +2,7 @@
     .name = .zq,
     .version = "0.1.1",
     .fingerprint = 0xb30bc229607e8f15,
-    .minimum_zig_version = "0.15.2",
+    .minimum_zig_version = "0.16.0",
     .paths = .{
         "build.zig",
         "build.zig.zon",

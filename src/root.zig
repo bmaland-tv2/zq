@@ -16,7 +16,7 @@ pub const parseFilter = @import("filter.zig").parseFilter;
 /// Format multi-entry ZON source and write to the given writer
 /// Handles files with multiple ZON entries (one per line or adjacent)
 /// Returns a ParseError if any entry is invalid ZON, null on success
-pub fn formatZonMulti(source: [:0]const u8, writer: *std.io.Writer, options: FormatterOptions, gpa: Allocator) !?ParseError {
+pub fn formatZonMulti(source: [:0]const u8, writer: *std.Io.Writer, options: FormatterOptions, gpa: Allocator) !?ParseError {
     var entries: std.ArrayList([]const u8) = .empty;
     defer entries.deinit(gpa);
 
@@ -41,7 +41,7 @@ pub fn formatZonMulti(source: [:0]const u8, writer: *std.io.Writer, options: For
 
 /// Format ZON source and write to the given writer
 /// Returns a ParseError if the input is invalid ZON, null on success
-pub fn formatZon(source: [:0]const u8, writer: *std.io.Writer, options: FormatterOptions, gpa: Allocator) !?ParseError {
+pub fn formatZon(source: [:0]const u8, writer: *std.Io.Writer, options: FormatterOptions, gpa: Allocator) !?ParseError {
     var ast = Ast.parse(gpa, source, .zon) catch {
         return .{ .message = "failed to parse ZON" };
     };
@@ -75,7 +75,7 @@ pub fn formatZon(source: [:0]const u8, writer: *std.io.Writer, options: Formatte
 test "format simple zon" {
     const allocator = std.testing.allocator;
     var buffer: [4096]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     const input = ".{.name=\"test\",.value=42}";
     const result = try formatZon(input, &writer, .{ .use_colors = false }, allocator);
@@ -95,7 +95,7 @@ test "format simple zon" {
 test "parse error on invalid character" {
     const allocator = std.testing.allocator;
     var buffer: [4096]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     const input = ".{.x=`}";
     const result = try formatZon(input, &writer, .{ .use_colors = false }, allocator);
@@ -107,7 +107,7 @@ test "parse error on invalid character" {
 test "parse error on unclosed brace" {
     const allocator = std.testing.allocator;
     var buffer: [4096]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     const input = ".{.name=\"test\"";
     const result = try formatZon(input, &writer, .{ .use_colors = false }, allocator);
@@ -117,7 +117,7 @@ test "parse error on unclosed brace" {
 test "parse error on unexpected closing brace" {
     const allocator = std.testing.allocator;
     var buffer: [4096]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     const input = ".{.x=1}}";
     const result = try formatZon(input, &writer, .{ .use_colors = false }, allocator);
@@ -127,7 +127,7 @@ test "parse error on unexpected closing brace" {
 test "parse error on missing identifier after dot" {
     const allocator = std.testing.allocator;
     var buffer: [4096]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     const input = ".{.name=\"test\",.=42}";
     const result = try formatZon(input, &writer, .{ .use_colors = false }, allocator);
@@ -137,7 +137,7 @@ test "parse error on missing identifier after dot" {
 test "parse error on bare identifier at top level" {
     const allocator = std.testing.allocator;
     var buffer: [4096]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     const input = "asdf.{.name=\"test\"}";
     const result = try formatZon(input, &writer, .{ .use_colors = false }, allocator);
@@ -148,7 +148,7 @@ test "parse error on bare identifier at top level" {
 test "parse error on bare identifier inside struct" {
     const allocator = std.testing.allocator;
     var buffer: [4096]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     const input = ".{.name=\"test\",asdf.value=42}";
     const result = try formatZon(input, &writer, .{ .use_colors = false }, allocator);
@@ -158,7 +158,7 @@ test "parse error on bare identifier inside struct" {
 test "parse error on standalone invalid identifier" {
     const allocator = std.testing.allocator;
     var buffer: [4096]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     const input = "foo";
     const result = try formatZon(input, &writer, .{ .use_colors = false }, allocator);
@@ -169,7 +169,7 @@ test "parse error on standalone invalid identifier" {
 test "multi-entry: adjacent entries" {
     const allocator = std.testing.allocator;
     var buffer: [4096]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     const input = ".{.a=1}.{.b=2}";
     const result = try formatZonMulti(input, &writer, .{ .use_colors = false }, allocator);
@@ -191,7 +191,7 @@ test "multi-entry: adjacent entries" {
 test "multi-entry: newline separated" {
     const allocator = std.testing.allocator;
     var buffer: [4096]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     const input = ".{.a=1}\n.{.b=2}";
     const result = try formatZonMulti(input, &writer, .{ .use_colors = false }, allocator);
@@ -213,7 +213,7 @@ test "multi-entry: newline separated" {
 test "multi-entry: single entry still works" {
     const allocator = std.testing.allocator;
     var buffer: [4096]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     const input = ".{.name=\"test\"}";
     const result = try formatZonMulti(input, &writer, .{ .use_colors = false }, allocator);
@@ -232,7 +232,7 @@ test "multi-entry: single entry still works" {
 test "multi-entry: empty input" {
     const allocator = std.testing.allocator;
     var buffer: [4096]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     const input = "";
     const result = try formatZonMulti(input, &writer, .{ .use_colors = false }, allocator);
@@ -243,7 +243,7 @@ test "multi-entry: empty input" {
 test "multi-entry: entries with strings containing braces" {
     const allocator = std.testing.allocator;
     var buffer: [4096]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     const input = ".{.x=\"{}\"}.{.y=1}";
     const result = try formatZonMulti(input, &writer, .{ .use_colors = false }, allocator);
@@ -263,5 +263,9 @@ test "multi-entry: entries with strings containing braces" {
 }
 
 test {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
+    _ = @import("formatter.zig");
+    _ = @import("filter.zig");
+    _ = @import("split.zig");
+    _ = @import("types.zig");
 }

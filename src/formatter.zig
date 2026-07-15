@@ -10,7 +10,7 @@ const PathSegment = types.PathSegment;
 
 ast: *const Ast,
 options: FormatterOptions,
-writer: *std.io.Writer,
+writer: *std.Io.Writer,
 indent_level: usize = 0,
 at_line_start: bool = true,
 semantic_error: ?ParseError = null,

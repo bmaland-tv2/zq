@@ -17,16 +17,14 @@ const Arg = enum {
     @"-r",
 };
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+pub fn main(init: std.process.Init) !void {
+    const gpa = init.gpa;
+    const io = init.io;
 
-    // Parse command line arguments
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+    const stdout_file = std.Io.File.stdout();
+    const stdin_file = std.Io.File.stdin();
+    const stderr_file = std.Io.File.stderr();
 
-    const stdout_file = std.fs.File.stdout();
     var monochrome = false;
     var force_color = false;
     var use_tabs = false;
@@ -66,23 +64,21 @@ pub fn main() !void {
         \\
     ;
 
-    // If no arguments and stdin is a TTY, show help
-    const stdin = std.fs.File.stdin();
-    if (args.len == 1 and stdin.isTty()) {
-        try stdout_file.writeAll(help_message);
-        return;
-    }
+    // Parse command line arguments
+    var args_it = try init.minimal.args.iterateAllocator(gpa);
+    defer args_it.deinit();
+    _ = args_it.skip(); // Skip program name
 
-    var i: usize = 1;
-    while (i < args.len) : (i += 1) {
-        const arg_str = args[i];
+    var saw_any_arg = false;
+    while (args_it.next()) |arg_str| {
+        saw_any_arg = true;
         if (std.meta.stringToEnum(Arg, arg_str)) |arg| switch (arg) {
             .@"--version", .@"-V" => {
-                try stdout_file.writeAll(build_options.version ++ "\n");
+                try stdout_file.writeStreamingAll(io, build_options.version ++ "\n");
                 return;
             },
             .@"--help", .@"-h" => {
-                try stdout_file.writeAll(help_message);
+                try stdout_file.writeStreamingAll(io, help_message);
                 return;
             },
             .@"--monochrome-output", .@"-M" => monochrome = true,
@@ -91,56 +87,64 @@ pub fn main() !void {
             .@"--raw-output", .@"-r" => raw_output = true,
             .@"--indent" => {
                 const indent_err = "zq: --indent requires a number (0-7)\n";
-                i += 1;
-                if (i >= args.len) {
-                    std.fs.File.stderr().writeAll(indent_err) catch {};
+                const value = args_it.next() orelse {
+                    stderr_file.writeStreamingAll(io, indent_err) catch {};
                     std.process.exit(1);
-                }
-                indent_size = std.fmt.parseInt(usize, args[i], 10) catch {
-                    std.fs.File.stderr().writeAll(indent_err) catch {};
+                };
+                indent_size = std.fmt.parseInt(usize, value, 10) catch {
+                    stderr_file.writeStreamingAll(io, indent_err) catch {};
                     std.process.exit(1);
                 };
                 if (indent_size > 7) {
-                    std.fs.File.stderr().writeAll(indent_err) catch {};
+                    stderr_file.writeStreamingAll(io, indent_err) catch {};
                     std.process.exit(1);
                 }
             },
         } else if (arg_str.len > 0 and arg_str[0] == '.') {
             filter_str = arg_str;
         } else {
-            const stderr = std.fs.File.stderr();
-            stderr.writeAll("zq: unknown argument: ") catch {};
-            stderr.writeAll(arg_str) catch {};
-            stderr.writeAll("\n") catch {};
+            stderr_file.writeStreamingAll(io, "zq: unknown argument: ") catch {};
+            stderr_file.writeStreamingAll(io, arg_str) catch {};
+            stderr_file.writeStreamingAll(io, "\n") catch {};
             std.process.exit(1);
         }
     }
 
+    // If no arguments and stdin is a TTY, show help
+    if (!saw_any_arg and try stdin_file.isTty(io)) {
+        try stdout_file.writeStreamingAll(io, help_message);
+        return;
+    }
+
     const filter = zq.parseFilter(
-        allocator,
+        gpa,
         filter_str,
     ) catch {
-        std.fs.File.stderr().writeAll("zq: invalid filter\n") catch {};
+        stderr_file.writeStreamingAll(io, "zq: invalid filter\n") catch {};
         std.process.exit(1);
     };
-    defer if (filter == .path) allocator.free(filter.path);
+    defer if (filter == .path) gpa.free(filter.path);
 
-    // Read all input from stdin (100MB limit)
+    // Read all input from stdin (100MB limit) as a sentinel-terminated slice
+    // for the AST parser.
     const max_input_size = 100 * 1024 * 1024;
-    const source_raw = try stdin.readToEndAlloc(allocator, max_input_size);
-    defer allocator.free(source_raw);
-
-    // Create sentinel-terminated slice for the AST parser
-    const source = try allocator.dupeZ(u8, source_raw);
-    defer allocator.free(source);
+    var read_buffer: [4096]u8 = undefined;
+    var stdin_reader = stdin_file.reader(io, &read_buffer);
+    const source = try stdin_reader.interface.allocRemainingAlignedSentinel(
+        gpa,
+        .limited(max_input_size),
+        .of(u8),
+        0,
+    );
+    defer gpa.free(source);
 
     // Setup stdout with buffer
     var buffer: [4096]u8 = undefined;
-    var stdout = stdout_file.writer(&buffer);
+    var stdout = stdout_file.writer(io, &buffer);
 
     // Check if stdout is a TTY to decide on colors
     // -C forces colors on, -M forces colors off (monochrome takes precedence)
-    const use_colors = !monochrome and (force_color or stdout_file.isTty());
+    const use_colors = !monochrome and (force_color or try stdout_file.isTty(io));
 
     // Format and write output (supports multi-entry ZON files)
     if (try zq.formatZonMulti(
@@ -153,9 +157,9 @@ pub fn main() !void {
             .filter = filter,
             .raw_output = raw_output,
         },
-        allocator,
+        gpa,
     )) |parse_error| {
-        parse_error.write(std.fs.File.stderr());
+        parse_error.write(io, stderr_file);
         std.process.exit(1);
     }
 
