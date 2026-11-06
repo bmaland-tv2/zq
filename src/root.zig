@@ -29,7 +29,7 @@ pub fn formatZonMulti(source: [:0]const u8, writer: *std.Io.Writer, options: For
 
     // Format each entry separately
     for (entries.items) |entry| {
-        const entry_z = try gpa.dupeZ(u8, entry);
+        const entry_z = try gpa.dupeSentinel(u8, entry, 0);
         defer gpa.free(entry_z);
 
         if (try formatZon(entry_z, writer, options, gpa)) |err| {
@@ -42,7 +42,7 @@ pub fn formatZonMulti(source: [:0]const u8, writer: *std.Io.Writer, options: For
 /// Format ZON source and write to the given writer
 /// Returns a ParseError if the input is invalid ZON, null on success
 pub fn formatZon(source: [:0]const u8, writer: *std.Io.Writer, options: FormatterOptions, gpa: Allocator) !?ParseError {
-    var ast = Ast.parse(gpa, source, .zon) catch {
+    var ast = Ast.parse(gpa, source, .{ .mode = .zon }) catch {
         return .{ .message = "failed to parse ZON" };
     };
     defer ast.deinit(gpa);
@@ -63,7 +63,7 @@ pub fn formatZon(source: [:0]const u8, writer: *std.Io.Writer, options: Formatte
         .writer = writer,
     };
 
-    try formatter.format(@enumFromInt(0)); // Root is always node 0
+    try formatter.format(@fromBackingInt(0)); // Root is always node 0
 
     // Check for semantic errors (e.g., invalid identifiers)
     if (formatter.semantic_error) |err| {

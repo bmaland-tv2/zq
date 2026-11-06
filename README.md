@@ -13,7 +13,7 @@ A lightweight command-line ZON processor. Like [jq](https://jqlang.github.io/jq/
 
 ## Installation
 
-Requires [Zig](https://ziglang.org/) 0.16.0 or later.
+Requires [Zig](https://ziglang.org/) 0.17.0 or later.
 
 ```bash
 git clone https://github.com/bmaland-tv2/zq
