@@ -13,6 +13,12 @@ A lightweight command-line ZON processor. Like [jq](https://jqlang.github.io/jq/
 
 ## Installation
 
+### Prebuilt binaries
+
+Download an archive for your platform (Linux, macOS, Windows; x86_64 and aarch64) from the [releases page](https://github.com/bmaland-tv2/zq/releases), extract it and put `zq` on your `PATH`.
+
+### From source
+
 Requires [Zig](https://ziglang.org/) 0.17.0 or later.
 
 ```bash
